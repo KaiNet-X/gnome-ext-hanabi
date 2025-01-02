@@ -20,6 +20,18 @@
             <description>Set the volume level for audio playback</description>
         </key>
 
+        <key name="target-window" type="i">
+            <default>0</default>
+            <summary>Target window</summary>
+            <description>Choose a specific window</description>
+        </key>
+
+        <key name="multi-window" type="b">
+            <default>true</default>
+            <summary>Show on multiple windows</summary>
+            <description>Choose a specific window or all windows</description>
+        </key>
+
         <key name="change-wallpaper" type="b">
             <default>false</default>
             <summary>Change Wallpaper</summary>
