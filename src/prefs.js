@@ -43,6 +43,8 @@ export default class HanabiExtensionPreferences extends ExtensionPreferences {
         prefsRowBoolean(window, generalGroup, _('Mute Audio'), 'mute', '');
         prefsRowInt(window, generalGroup, _('Volume Level'), 'volume', '', 0, 100, 1, 10);
         prefsRowBoolean(window, generalGroup, _('Show Panel Menu'), 'show-panel-menu', '');
+        prefsRowBoolean(window, generalGroup, _('Show on multiple windows'), 'multi-window', '');
+        prefsRowInt(window, generalGroup, _('Target window'), 'target-window', '', 0, 16, 1, 1);
 
         /**
          * Auto Pause

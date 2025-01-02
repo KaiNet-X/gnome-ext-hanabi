@@ -108,7 +108,8 @@ let windowed = false;
 let fullscreened = true;
 let isDebugMode = extSettings ? extSettings.get_boolean('debug-mode') : true;
 let changeWallpaperTimerId = null;
-
+let windowTarget = extSettings ? extSettings.get_int('target-window') : 0;
+let multiWindow = extSettings?.get_boolean('multi-window') ?? true;
 
 const HanabiRenderer = GObject.registerClass(
     {
@@ -167,6 +168,12 @@ const HanabiRenderer = GObject.registerClass(
                 case 'volume':
                     volume = settings.get_int(key) / 100.0;
                     this.setVolume(volume);
+                    break;
+                case 'target-window':
+                    this.setWindowTarget(settings.get_int('target-window'));
+                    break;
+                case 'multi-window':
+                    this.setMultiWindow(settings.get_boolean('mulit-window'));
                     break;
                 case 'change-wallpaper':
                     changeWallpaper = settings.get_boolean(key);
@@ -309,59 +316,67 @@ const HanabiRenderer = GObject.registerClass(
             }
         }
 
-        _buildUI() {
-            this._monitors.forEach((gdkMonitor, index) => {
-                let widget = this._getWidgetFromSharedPaintable();
+        _buildMon(gdkMonitor, index) {
+            let widget = this._getWidgetFromSharedPaintable();
 
-                // Avoid creating another instance if we couldn't get the shared paintable
-                if (index > 0 && !widget)
-                    return;
+            // Avoid creating another instance if we couldn't get the shared paintable
+            // if (index > 0 && !widget)
+            //     return;
 
-                if (!widget) {
-                    if (!forceMediaFile && haveGstPlay) {
-                        let sink = null;
-                        if (!forceGtk4PaintableSink) {
-                            // Try to find "clappersink" for best performance
-                            sink = Gst.ElementFactory.make(
-                                'clappersink',
-                                'clappersink'
-                            );
-                        }
-
-                        // Try "gtk4paintablesink" from gstreamer-rs plugins as 2nd best choice
-                        if (!sink) {
-                            sink = Gst.ElementFactory.make(
-                                'gtk4paintablesink',
-                                'gtk4paintablesink'
-                            );
-                        }
-
-                        if (sink)
-                            widget = this._getWidgetFromSink(sink);
+            if (!widget) {
+                if (!forceMediaFile && haveGstPlay) {
+                    let sink = null;
+                    if (!forceGtk4PaintableSink) {
+                        // Try to find "clappersink" for best performance
+                        sink = Gst.ElementFactory.make(
+                            'clappersink',
+                            'clappersink'
+                        );
                     }
 
-                    if (!widget)
-                        widget = this._getGtkStockWidget();
+                    // Try "gtk4paintablesink" from gstreamer-rs plugins as 2nd best choice
+                    if (!sink) {
+                        sink = Gst.ElementFactory.make(
+                            'gtk4paintablesink',
+                            'gtk4paintablesink'
+                        );
+                    }
+
+                    if (sink)
+                        widget = this._getWidgetFromSink(sink);
                 }
 
-                let geometry = gdkMonitor.get_geometry();
-                let state = {
-                    position: [geometry.x, geometry.y],
-                    keepAtBottom: true,
-                    keepMinimized: true,
-                    keepPosition: true,
-                };
-                let window = new HanabiRendererWindow(
-                    this,
-                    nohide
-                        ? `Hanabi Renderer #${index} (using ${this._gstImplName})`
-                        : `@${applicationId}!${JSON.stringify(state)}|${index}`,
-                    widget,
-                    gdkMonitor
-                );
+                if (!widget)
+                    widget = this._getGtkStockWidget();
+            }
 
-                this._hanabiWindows.push(window);
-            });
+            let geometry = gdkMonitor.get_geometry();
+            let state = {
+                position: [geometry.x, geometry.y],
+                keepAtBottom: true,
+                keepMinimized: true,
+                keepPosition: true,
+            };
+            let window = new HanabiRendererWindow(
+                this,
+                nohide
+                    ? `Hanabi Renderer #${index} (using ${this._gstImplName})`
+                    : `@${applicationId}!${JSON.stringify(state)}|${index}`,
+                widget,
+                gdkMonitor
+            );
+
+            this._hanabiWindows.push(window);
+        }
+
+        _buildUI() {
+            if (!multiWindow)
+                this._buildMon(this._monitors[windowTarget], windowTarget);
+            else {
+                this._monitors.forEach((gdkMonitor, index) => {
+                    this._buildMon(gdkMonitor, index);
+                });
+            }
             console.log(`using ${this._gstImplName} for video output`);
         }
 
@@ -561,6 +576,32 @@ const HanabiRenderer = GObject.registerClass(
             if (player.volume === _volume)
                 player.volume = null;
             player.volume = _volume;
+        }
+
+        setWindowTarget(_target) {
+            windowTarget = _target;
+            if (!multiWindow)
+                return;
+            for (let window of this._hanabiWindows) {
+                window.close();
+            }
+            this._hanabiWindows = [];
+            this._buildUI();
+            this._hanabiWindows.forEach(window => {
+                window.present();
+            });
+        }
+
+        setMultiWindow(_multi) {
+            multiWindow = _multi;
+            for (let window of this._hanabiWindows) {
+                window.close();
+            }
+            this._hanabiWindows = [];
+            this._buildUI();
+            this._hanabiWindows.forEach(window => {
+                window.present();
+            });
         }
 
         setMute(_mute) {
